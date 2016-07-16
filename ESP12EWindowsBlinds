@@ -1,0 +1,120 @@
+// NodeMCU pinout https://acrobotic.com/media/wysiwyg/products/esp8266_devkit_horizontal-01.png
+// ESP8266 ESP-12E dev board and A4899 stepper driver
+
+#include <ESP8266WiFi.h>
+
+#define enable 5 // Enable pin
+#define step 12 // Step PWM 
+#define direction 14 // Dir
+int i; 
+ 
+const char* ssid = "Rohoho";
+const char* password = "99999999";
+ 
+int BLIND = 2; // GPIO2
+WiFiServer server(80);
+ 
+void setup() {
+  Serial.begin(115200);
+  delay(10);
+ 
+  pinMode(enable,OUTPUT);
+  pinMode(step,OUTPUT);
+  pinMode(direction,OUTPUT);
+  digitalWrite(enable,LOW); // Enable A4899
+   
+  // Connect to WiFi network
+  Serial.println();
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+   
+  WiFi.begin(ssid, password);
+   
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected");
+   
+  // Start the server
+  server.begin();
+  Serial.println("Server started");
+ 
+  // Print the IP address
+  Serial.print("Use this URL to connect: ");
+  Serial.print("http://");
+  Serial.print(WiFi.localIP());
+  Serial.println("/");
+    
+}
+void blindMove(){
+  for(i = 0; i < 200; i++){ 
+    digitalWrite(step,HIGH);
+    delay(10); // Wait
+    digitalWrite(step,LOW);
+    delay(10); // Wait
+  }  
+}
+
+void blindON(){
+  digitalWrite(direction,HIGH); 
+  blindMove();
+}
+
+void blindOFF(){
+  digitalWrite(direction,LOW); 
+  blindMove(); 
+}
+ 
+void loop() {
+  WiFiClient client = server.available();
+  if (!client) {
+    return;
+  }
+   
+  Serial.println("new client");
+  while(!client.available()){
+    delay(1);
+  }
+   
+  String request = client.readStringUntil('\r');
+  Serial.println(request);
+  client.flush();
+   
+  int value = LOW;
+  if (request.indexOf("/BLIND=ON") != -1) {
+    blindON();
+    value = HIGH;
+  } 
+  if (request.indexOf("/BLIND=OFF") != -1){
+    blindOFF();
+    value = LOW;
+  }
+ 
+  // Return the response
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println(""); //  do not forget this one
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+   
+  client.print("BLIND is now: ");
+   
+  if(value == HIGH) {
+    client.print("On");  
+  } else {
+    client.print("Off");
+  }
+  client.println("<br><br>");
+  client.println("Click <a href=\"/BLIND=ON\">here</a> turn the BLIND on pin 2 ON<br>");
+  client.println("Click <a href=\"/BLIND=OFF\">here</a> turn the BLIND on pin 2 OFF<br>");
+  client.println("</html>");
+ 
+  delay(1);
+  Serial.println("Client disonnected");
+  Serial.println("");
+  
+}
+ 
